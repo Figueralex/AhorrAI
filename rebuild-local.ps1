@@ -10,13 +10,6 @@ $ErrorActionPreference = 'Continue'
 Write-Host "Instalando dependencias desde cero (npm install)..."
 npm install
 
-Write-Host "Regenerando rutas nativas de Expo..."
-npx expo prebuild -p android --clean
-
-Write-Host "Verificando y configurando rutas del SDK..."
-$env:ANDROID_HOME="C:\Users\noctu\AppData\Local\Android\Sdk"
-Set-Content -Path "android\local.properties" -Value "sdk.dir=C\:/Users/noctu/AppData/Local/Android/Sdk" -Force -Encoding UTF8
-
-Write-Host "Compilando nueva APK nativa..."
-Set-Location android
-.\gradlew assembleRelease
+Write-Host "Iniciando proceso de firmado y compilación oficial con EAS Local..."
+# Si eas pide confirmar la creación de credenciales, el usuario lo vera e interactuará aquí.
+cmd /c npx eas build --platform android --local --profile production
