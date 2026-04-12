@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "AhorrAI",
+    "slug": "AhorrAI",
+    "owner": "dumkayt",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "ios": {
+      "supportsTablet": true
+    },
+    "scheme": "ahorrai",
+    "android": {
+      "package": "com.ahorrai.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      "expo-audio"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f324c3b9-c968-4784-a603-ae256c9c1f9b"
+      }
+    }
+  }
+}
