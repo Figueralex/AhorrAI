@@ -98,11 +98,44 @@ export default function TransactionsScreen() {
   const handleSaveEdit = async () => {
     setSaving(true);
     try {
+      const newAmount = parseFloat(editAmount);
+      const isOriginalBs = editingTx.originalCurrency === 'Bs';
+      
+      // Calculate rate based on the existing transaction amounts to maintain historical rate
+      let rate = 36;
+      if (editingTx.amount_usd && editingTx.amount_usd > 0) {
+         rate = editingTx.amount_bs / editingTx.amount_usd;
+      }
+
+      let newAmountUsd = 0;
+      let newAmountBs = 0;
+      
+      if (isOriginalBs) {
+         newAmountBs = newAmount;
+         newAmountUsd = newAmount / rate;
+      } else {
+         newAmountUsd = newAmount;
+         newAmountBs = newAmount * rate;
+      }
+
       const updated = {
-        originalAmount: parseFloat(editAmount),
+        originalAmount: newAmount,
+        amount_bs: newAmountBs,
+        amount_usd: newAmountUsd,
         category: editCategory,
         account: editAccount,
       };
+
+      if (editingTx.type === 'transfer') {
+        if (editingTx.fromCurrency === 'Bs') updated.fromAmount = newAmountBs;
+        else if (editingTx.fromCurrency === 'USD' || editingTx.fromCurrency === 'USDT') updated.fromAmount = newAmountUsd;
+        else updated.fromAmount = newAmount;
+
+        if (editingTx.toCurrency === 'Bs') updated.toAmount = newAmountBs;
+        else if (editingTx.toCurrency === 'USD' || editingTx.toCurrency === 'USDT') updated.toAmount = newAmountUsd;
+        else updated.toAmount = newAmount;
+      }
+      
       await updateTransaction(editingTx.id, updated);
       setEditModalVisible(false);
       loadData();

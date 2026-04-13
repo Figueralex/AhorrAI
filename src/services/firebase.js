@@ -1,5 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { initializeAuth, getReactNativePersistence, GoogleAuthProvider, signInWithCredential, signOut } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAgpcqRT3T8GAhH4bhMY1NSfGGP2Y3phG8",
@@ -11,11 +13,22 @@ const firebaseConfig = {
   measurementId: "G-GY35R98JV0"
 };
 
-// Initialize Firebase (solo Firestore, sin Auth por ahora)
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Auth desactivado temporalmente para estabilidad del APK
-const auth = null;
+// Initialize Firebase Auth con persistencia en React Native
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage)
+});
+
+export const loginWithGoogle = async (idToken) => {
+  const credential = GoogleAuthProvider.credential(idToken);
+  return await signInWithCredential(auth, credential);
+};
+
+export const logoutUser = async () => {
+  await signOut(auth);
+};
 
 export { app, auth, db };

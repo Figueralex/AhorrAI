@@ -14,7 +14,8 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: '999195085839-a92o1sq6372q8ov86b5hsh76v885g1i4.apps.googleusercontent.com',
+    clientId: '999195085839-a92o1sq6372q8ov86b5hsh76v885g1i4.apps.googleusercontent.com', // Web Client ID (Usado por Expo Go indirectamente)
+    androidClientId: 'YOUR_ANDROID_CLIENT_ID_HERE.apps.googleusercontent.com', // Android Client ID (Obligatorio para el APK)
   });
 
   useEffect(() => {

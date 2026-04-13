@@ -1,4 +1,4 @@
-import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, setDoc, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -29,21 +29,42 @@ const saveLocalList = async (key, list) => {
 // --- SYNC ENGINE (Multi-purpose) ---
 const syncToFirebase = async (type, data, method = 'add', id = null) => {
     try {
-        // Auth está desactivado temporalmente - sync omitido
         if (!auth || !auth.currentUser) return;
-
-        const collectionPath = `users/${auth.currentUser.uid}/${type}`;
         
-        if (method === 'add') {
-            await addDoc(collection(db, collectionPath), data);
-        } else if (method === 'update' && id) {
-            console.log(`[Sync] Update pending implementation for ${id}`);
-        } else if (method === 'delete' && id) {
-             console.log(`[Sync] Delete pending implementation for ${id}`);
+        // El id es obligatorio para mantener la consistencia entre BD local y remota
+        const docId = id || data.id;
+        if (!docId) return;
+
+        const docRef = doc(db, `users/${auth.currentUser.uid}/${type}`, docId);
+        
+        if (method === 'add' || method === 'update') {
+            await setDoc(docRef, data, { merge: true });
+        } else if (method === 'delete') {
+             await deleteDoc(docRef);
+        }
+    } catch (e) {
+        console.log(`[Sync] Error: ${e.message}`);
+    }
+};
+
+export const downloadBackupFromFirebase = async () => {
+    try {
+        if (!auth || !auth.currentUser) return;
+        
+        const txSnap = await getDocs(collection(db, `users/${auth.currentUser.uid}/transactions`));
+        const transactions = txSnap.docs.map(d => d.data());
+        if (transactions.length > 0) {
+            await saveLocalList(TX_KEY, transactions);
+        }
+
+        const accSnap = await getDocs(collection(db, `users/${auth.currentUser.uid}/accounts`));
+        const accounts = accSnap.docs.map(d => d.data());
+        if (accounts.length > 0) {
+            await saveLocalList(ACC_KEY, accounts);
         }
         
     } catch (e) {
-        console.log(`[Sync] Error: ${e.message}`);
+        console.log(`[Sync Backup] Error: ${e.message}`);
     }
 };
 
@@ -60,7 +81,7 @@ export const saveTransaction = async (transaction) => {
   };
   const list = await getLocal(TX_KEY);
   await saveLocalList(TX_KEY, [newTx, ...list]);
-  syncToFirebase('transactions', newTx);
+  syncToFirebase('transactions', newTx, 'add', newTx.id);
   return newTx.id;
 };
 
@@ -70,6 +91,7 @@ export const updateTransaction = async (id, updatedData) => {
     if (index !== -1) {
         list[index] = { ...list[index], ...updatedData };
         await saveLocalList(TX_KEY, list);
+        syncToFirebase('transactions', list[index], 'update', id);
         return true;
     }
     return false;
@@ -79,6 +101,7 @@ export const deleteTransaction = async (id) => {
     const list = await getLocal(TX_KEY);
     const filtered = list.filter(tx => tx.id !== id);
     await saveLocalList(TX_KEY, filtered);
+    syncToFirebase('transactions', null, 'delete', id);
     return true;
 };
 
@@ -96,7 +119,7 @@ export const saveAccount = async (account) => {
     };
     const list = await getLocal(ACC_KEY);
     await saveLocalList(ACC_KEY, [newAcc, ...list]);
-    syncToFirebase('accounts', newAcc);
+    syncToFirebase('accounts', newAcc, 'add', newAcc.id);
     return newAcc.id;
 };
 
@@ -106,8 +129,7 @@ export const updateAccount = async (id, updatedData) => {
     if (index !== -1) {
         list[index] = { ...list[index], ...updatedData };
         await saveLocalList(ACC_KEY, list);
-        // Background sync: In a simple app without Firebase ID mapping, 
-        // we'll just keep local for now or implement mapping later.
+        syncToFirebase('accounts', list[index], 'update', id);
         return true;
     }
     return false;
@@ -117,6 +139,7 @@ export const deleteAccount = async (id) => {
     const list = await getLocal(ACC_KEY);
     const filtered = list.filter(acc => acc.id !== id);
     await saveLocalList(ACC_KEY, filtered);
+    syncToFirebase('accounts', null, 'delete', id);
     return true;
 };
 

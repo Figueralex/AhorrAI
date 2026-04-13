@@ -15,6 +15,8 @@ import { processAndSaveTransactionFromAI, fetchAccounts, initializeDefaultAccoun
 import { fetchDailyExchangeRate } from '../services/currency';
 import { useStore } from '../store/useStore';
 
+import LoginScreen from '../screens/LoginScreen';
+
 const Tab = createBottomTabNavigator();
 
 const CustomTabBarButton = ({ children, onPress }) => (
@@ -34,17 +36,36 @@ const CustomTabBarButton = ({ children, onPress }) => (
 );
 
 export default function AppNavigator() {
-  const { setUser } = useStore();
+  const { user, setUser } = useStore();
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Auto-login local e inicialización de cuentas por defecto
   useEffect(() => {
-    setUser({ uid: 'local-user', displayName: 'Usuario', email: 'local@ahorrai.app' });
-    initializeDefaultAccounts();
+    import('firebase/auth').then(({ onAuthStateChanged }) => {
+      import('../services/firebase').then(({ auth }) => {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+          if (firebaseUser) {
+            setUser({ 
+              uid: firebaseUser.uid, 
+              displayName: firebaseUser.displayName, 
+              email: firebaseUser.email, 
+              photoURL: firebaseUser.photoURL 
+            });
+            // Al iniciar sesión, inicializar/sincronizar DB
+            const { downloadBackupFromFirebase, initializeDefaultAccounts } = await import('../services/db');
+            await downloadBackupFromFirebase(); // Trae datos existentes
+            await initializeDefaultAccounts(); // Por si es cuenta nueva
+          } else {
+            setUser(null);
+          }
+        });
+        return () => unsubscribe();
+      });
+    });
   }, []);
 
   const handleTransactionSubmit = async (text) => {
     try {
+      const { fetchAccounts, processAndSaveTransactionFromAI } = await import('../services/db');
       const accounts = await fetchAccounts();
       const accountNames = accounts.map(a => a.name);
       const parsedData = await parseTransactionText(text, accountNames);
@@ -70,67 +91,71 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer theme={MyTheme}>
-      <>
-        <Tab.Navigator
-          screenOptions={({ route }) => ({
-            headerShown: false,
-            tabBarShowLabel: false,
-            tabBarIcon: ({ focused, color, size }) => {
-              let iconName;
-              if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
-              else if (route.name === 'Transactions') iconName = focused ? 'bar-chart' : 'bar-chart-outline';
-              else if (route.name === 'Challenges') iconName = focused ? 'medal' : 'medal-outline';
-              else if (route.name === 'Settings') iconName = focused ? 'settings' : 'settings-outline';
+      {!user ? (
+        <LoginScreen />
+      ) : (
+        <>
+          <Tab.Navigator
+            screenOptions={({ route }) => ({
+              headerShown: false,
+              tabBarShowLabel: false,
+              tabBarIcon: ({ focused, color, size }) => {
+                let iconName;
+                if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
+                else if (route.name === 'Transactions') iconName = focused ? 'bar-chart' : 'bar-chart-outline';
+                else if (route.name === 'Challenges') iconName = focused ? 'medal' : 'medal-outline';
+                else if (route.name === 'Settings') iconName = focused ? 'settings' : 'settings-outline';
 
-              if (!iconName) return null;
-              return <Ionicons name={iconName} size={28} color={focused ? Colors.primary : Colors.textSecondary} />;
-            },
-            tabBarStyle: {
-              position: 'absolute',
-              bottom: 25,
-              left: 20,
-              right: 20,
-              elevation: 0,
-              backgroundColor: Colors.surface,
-              borderRadius: 15,
-              height: 70,
-              borderTopWidth: 0,
-              ...styles.shadow
-            }
-          })}
-        >
-          <Tab.Screen name="Home" component={HomeScreen} />
-          <Tab.Screen name="Transactions" component={TransactionsScreen} />
-
-          <Tab.Screen
-            name="VoiceInput"
-            component={HomeScreen}
-            options={{
-              tabBarIcon: ({ focused }) => (
-                <Ionicons name="mic" size={32} color="#000" />
-              ),
-              tabBarButton: (props) => (
-                <CustomTabBarButton {...props} />
-              )
-            }}
-            listeners={({ navigation }) => ({
-              tabPress: e => {
-                e.preventDefault();
-                setModalVisible(true);
+                if (!iconName) return null;
+                return <Ionicons name={iconName} size={28} color={focused ? Colors.primary : Colors.textSecondary} />;
+              },
+              tabBarStyle: {
+                position: 'absolute',
+                bottom: 25,
+                left: 20,
+                right: 20,
+                elevation: 0,
+                backgroundColor: Colors.surface,
+                borderRadius: 15,
+                height: 70,
+                borderTopWidth: 0,
+                ...styles.shadow
               }
             })}
+          >
+            <Tab.Screen name="Home" component={HomeScreen} />
+            <Tab.Screen name="Transactions" component={TransactionsScreen} />
+
+            <Tab.Screen
+              name="VoiceInput"
+              component={HomeScreen}
+              options={{
+                tabBarIcon: ({ focused }) => (
+                  <Ionicons name="mic" size={32} color="#000" />
+                ),
+                tabBarButton: (props) => (
+                  <CustomTabBarButton {...props} />
+                )
+              }}
+              listeners={({ navigation }) => ({
+                tabPress: e => {
+                  e.preventDefault();
+                  setModalVisible(true);
+                }
+              })}
+            />
+
+            <Tab.Screen name="Challenges" component={ChallengesScreen} />
+            <Tab.Screen name="Settings" component={SettingsStack} />
+          </Tab.Navigator>
+
+          <InputModal
+            visible={modalVisible}
+            onClose={() => setModalVisible(false)}
+            onSubmit={handleTransactionSubmit}
           />
-
-          <Tab.Screen name="Challenges" component={ChallengesScreen} />
-          <Tab.Screen name="Settings" component={SettingsStack} />
-        </Tab.Navigator>
-
-        <InputModal
-          visible={modalVisible}
-          onClose={() => setModalVisible(false)}
-          onSubmit={handleTransactionSubmit}
-        />
-      </>
+        </>
+      )}
     </NavigationContainer>
   );
 }
