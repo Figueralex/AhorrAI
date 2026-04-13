@@ -11,11 +11,13 @@ import { Colors } from '../theme/colors';
 import InputModal from '../components/InputModal';
 import { Ionicons } from '@expo/vector-icons';
 import { parseTransactionText } from '../services/ai';
-import { processAndSaveTransactionFromAI, fetchAccounts, initializeDefaultAccounts } from '../services/db';
+import { processAndSaveTransactionFromAI, fetchAccounts, initializeDefaultAccounts, downloadBackupFromFirebase } from '../services/db';
 import { fetchDailyExchangeRate } from '../services/currency';
 import { useStore } from '../store/useStore';
 
 import LoginScreen from '../screens/LoginScreen';
+import { auth } from '../services/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const Tab = createBottomTabNavigator();
 
@@ -40,32 +42,31 @@ export default function AppNavigator() {
   const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    import('firebase/auth').then(({ onAuthStateChanged }) => {
-      import('../services/firebase').then(({ auth }) => {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-          if (firebaseUser) {
-            setUser({ 
-              uid: firebaseUser.uid, 
-              displayName: firebaseUser.displayName, 
-              email: firebaseUser.email, 
-              photoURL: firebaseUser.photoURL 
-            });
-            // Al iniciar sesión, inicializar/sincronizar DB
-            const { downloadBackupFromFirebase, initializeDefaultAccounts } = await import('../services/db');
-            await downloadBackupFromFirebase(); // Trae datos existentes
-            await initializeDefaultAccounts(); // Por si es cuenta nueva
-          } else {
-            setUser(null);
-          }
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({ 
+          uid: firebaseUser.uid, 
+          displayName: firebaseUser.displayName, 
+          email: firebaseUser.email, 
+          photoURL: firebaseUser.photoURL 
         });
-        return () => unsubscribe();
-      });
+        // Al iniciar sesión, inicializar/sincronizar DB
+        try {
+          await downloadBackupFromFirebase(); // Trae datos existentes
+          await initializeDefaultAccounts(); // Por si es cuenta nueva
+        } catch (e) {
+          console.error("Error inicializando DB:", e);
+        }
+      } else {
+        setUser(null);
+      }
     });
-  }, []);
+
+    return () => unsubscribe();
+  }, [setUser]);
 
   const handleTransactionSubmit = async (text) => {
     try {
-      const { fetchAccounts, processAndSaveTransactionFromAI } = await import('../services/db');
       const accounts = await fetchAccounts();
       const accountNames = accounts.map(a => a.name);
       const parsedData = await parseTransactionText(text, accountNames);
