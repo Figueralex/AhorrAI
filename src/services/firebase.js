@@ -17,18 +17,27 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Initialize Firebase Auth con persistencia en React Native
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
+// Manejo perezoso de Auth para evitar Crash al inicio
+let _auth = null;
+
+export const getAuthInstance = () => {
+  if (!_auth) {
+    _auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage)
+    });
+  }
+  return _auth;
+};
 
 export const loginWithGoogle = async (idToken) => {
+  const auth = getAuthInstance();
   const credential = GoogleAuthProvider.credential(idToken);
   return await signInWithCredential(auth, credential);
 };
 
 export const logoutUser = async () => {
+  const auth = getAuthInstance();
   await signOut(auth);
 };
 
-export { app, auth, db };
+export { app, db };

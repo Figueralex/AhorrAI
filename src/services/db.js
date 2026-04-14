@@ -1,5 +1,5 @@
 import { collection, setDoc, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
-import { db, auth } from './firebase';
+import { db, getAuthInstance } from './firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Local Storage Keys
@@ -29,6 +29,7 @@ const saveLocalList = async (key, list) => {
 // --- SYNC ENGINE (Multi-purpose) ---
 const syncToFirebase = async (type, data, method = 'add', id = null) => {
     try {
+        const auth = getAuthInstance();
         if (!auth || !auth.currentUser) return;
         
         // El id es obligatorio para mantener la consistencia entre BD local y remota
@@ -49,6 +50,7 @@ const syncToFirebase = async (type, data, method = 'add', id = null) => {
 
 export const downloadBackupFromFirebase = async () => {
     try {
+        const auth = getAuthInstance();
         if (!auth || !auth.currentUser) return;
         
         const txSnap = await getDocs(collection(db, `users/${auth.currentUser.uid}/transactions`));

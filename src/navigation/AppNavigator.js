@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
@@ -16,7 +16,7 @@ import { fetchDailyExchangeRate } from '../services/currency';
 import { useStore } from '../store/useStore';
 
 import LoginScreen from '../screens/LoginScreen';
-import { auth } from '../services/firebase';
+import { getAuthInstance } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const Tab = createBottomTabNavigator();
@@ -40,29 +40,37 @@ const CustomTabBarButton = ({ children, onPress }) => (
 export default function AppNavigator() {
   const { user, setUser } = useStore();
   const [modalVisible, setModalVisible] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser({ 
-          uid: firebaseUser.uid, 
-          displayName: firebaseUser.displayName, 
-          email: firebaseUser.email, 
-          photoURL: firebaseUser.photoURL 
-        });
-        // Al iniciar sesión, inicializar/sincronizar DB
-        try {
-          await downloadBackupFromFirebase(); // Trae datos existentes
-          await initializeDefaultAccounts(); // Por si es cuenta nueva
-        } catch (e) {
-          console.error("Error inicializando DB:", e);
+    // Retraso de seguridad para evitar Crash nativo al inicio
+    const timer = setTimeout(() => {
+      const auth = getAuthInstance();
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+          setUser({ 
+            uid: firebaseUser.uid, 
+            displayName: firebaseUser.displayName, 
+            email: firebaseUser.email, 
+            photoURL: firebaseUser.photoURL 
+          });
+          // Al iniciar sesión, inicializar/sincronizar DB
+          try {
+            await downloadBackupFromFirebase(); // Trae datos existentes
+            await initializeDefaultAccounts(); // Por si es cuenta nueva
+          } catch (e) {
+            console.error("Error inicializando DB:", e);
+          }
+        } else {
+          setUser(null);
         }
-      } else {
-        setUser(null);
-      }
-    });
+        setIsAuthReady(true);
+      });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    }, 10000);
+
+    return () => clearTimeout(timer);
   }, [setUser]);
 
   const handleTransactionSubmit = async (text) => {
@@ -92,7 +100,11 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer theme={MyTheme}>
-      {!user ? (
+      {!isAuthReady ? (
+        <View style={{ flex: 1, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : !user ? (
         <LoginScreen />
       ) : (
         <>
