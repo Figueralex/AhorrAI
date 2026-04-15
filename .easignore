@@ -9,3 +9,8 @@ web-build
 *.p12
 *.key
 *.mobileprovision
++VERSIONES APK+
+*.apk
+*.aab
+*.log
+.git

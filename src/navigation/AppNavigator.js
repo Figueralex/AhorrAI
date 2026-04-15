@@ -17,7 +17,6 @@ import { useStore } from '../store/useStore';
 
 import LoginScreen from '../screens/LoginScreen';
 import { getAuthInstance } from '../services/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 
 const Tab = createBottomTabNavigator();
 
@@ -43,9 +42,11 @@ export default function AppNavigator() {
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
-    // Retraso de seguridad para evitar Crash nativo al inicio
+    // Retraso pequeño para asegurar que todos los módulos estén cargados
     const timer = setTimeout(() => {
       const auth = getAuthInstance();
+      // Import dinámico para evitar que firebase/auth se cargue antes que el componente auth esté registrado
+      const { onAuthStateChanged } = require('firebase/auth');
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
           setUser({ 
@@ -68,7 +69,7 @@ export default function AppNavigator() {
       });
 
       return () => unsubscribe();
-    }, 10000);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [setUser]);
