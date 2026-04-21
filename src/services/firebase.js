@@ -24,27 +24,33 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
 
-// Inicializar Auth con persistencia AsyncStorage
-// Se inicializa al nivel del módulo para evitar "Component auth has not been registered yet"
-let _auth;
-try {
-  _auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-} catch (e) {
-  // Si ya fue inicializado (hot reload), usar getAuth
-  _auth = getAuth(app);
-}
+// Modificamos la exportación para inicializar auth perezosamente (lazy)
+// Esto evita el error "Component auth has not been registered yet" durante la carga del módulo
+let _auth = null;
 
-export const getAuthInstance = () => _auth;
+export const getAuthInstance = () => {
+  if (!_auth) {
+    try {
+      _auth = initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage),
+      });
+    } catch (e) {
+      // Si ya fue inicializado, obtener la instancia
+      _auth = getAuth(app);
+    }
+  }
+  return _auth;
+};
 
 export const loginWithGoogle = async (idToken) => {
+  const auth = getAuthInstance();
   const credential = GoogleAuthProvider.credential(idToken);
-  return await signInWithCredential(_auth, credential);
+  return await signInWithCredential(auth, credential);
 };
 
 export const logoutUser = async () => {
-  await signOut(_auth);
+  const auth = getAuthInstance();
+  await signOut(auth);
 };
 
 export { app, db };
